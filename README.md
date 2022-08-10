@@ -1,22 +1,25 @@
 # Lustre Metrics Exporter
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/HewlettPackard/lustre_exporter)](https://goreportcard.com/report/github.com/HewlettPackard/lustre_exporter)
-[![Build Status](https://travis-ci.org/HewlettPackard/lustre_exporter.svg?branch=master)](https://travis-ci.org/HewlettPackard/lustre_exporter)
+rebuild from github.com/HewlettPackard/lustre_exporter
 
-[Prometheus](https://prometheus.io/) exporter for Lustre metrics.
+new functions:
+1. add v2 vesion collect logic(default)  
+    1. using cache to skip parsing data via read and parsing file repeatedly, it can be execute 7-10x faster than old version for large files parsing  
+    2. add limitation of runtimes(default 4), if runtimes reach limit, the new request will wait and get data from the prev last request
+
 
 ## Getting
 
 ```
-go get github.com/HewlettPackard/lustre_exporter
+git clone https://github.com/ziyht/lustre_exporter.git
 ```
 
 ## Building
 
-
 ```
-cd $GOPATH/src/github.com/HewlettPackard/lustre_exporter
-make
+cd lustre_exporter
+go mod tidy
+make build
 ```
 
 ## Running
