@@ -1,6 +1,6 @@
 # Lustre Metrics Exporter
 
-rebuild from github.com/HewlettPackard/lustre_exporter
+rebuild from HewlettPackard's [LustreExporter](https://github.com/HewlettPackard/lustre_exporter)
 
 new functions:
 1. add v2 vesion collect logic(default)  

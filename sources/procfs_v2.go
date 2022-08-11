@@ -148,7 +148,7 @@ func (ctx *procfsV2Ctx) parseBRWStats(nodeType string, metricType string, path s
 		return err
 	}
 
-	statsFileBytes, err := ctx.fr.readFile(filepath.Clean(path))
+	statsFileBytes, err := ctx.fr.readFile(path)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (ctx *procfsV2Ctx) parseFile(nodeType string, metricType string, path strin
 }
 
 func (ctx *procfsV2Ctx)parseStatsFile(helpText string, promName string, path string, hasMultipleVals bool) (metricList []lustreStatsMetric, err error) {
-	statsFileBytes, err := ctx.fr.readFile(filepath.Clean(path))
+	statsFileBytes, err := ctx.fr.readFile(path)
 	if err != nil {
 		return nil, err
 	}

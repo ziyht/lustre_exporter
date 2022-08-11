@@ -34,9 +34,11 @@ func (fr *fileReader)readFileAsync(path string) {
 		return 
 	}
 
+	path = filepath.Clean(path)
+
 	fr.wg.Add(1)
 	fn := func() {
-		data, err := ioutil.ReadFile(filepath.Clean(path))
+		data, err := ioutil.ReadFile(path)
 		if err == nil {
 			fr.mu.Lock()
 			defer fr.mu.Unlock()
@@ -61,14 +63,14 @@ func (fr *fileReader)readFile(path string) ([]byte, error) {
 	fr.mu.Lock()
 	defer fr.mu.Unlock()
 
+	path = filepath.Clean(path)
+
 	data, ok := fr.files[path]
 	if ok && data != nil{
-	  //log.Infof("cache meet: %s\n", path)
 		return data, nil
 	}
 
-	//log.Infof("cache miss: %s\n", path)
-	data, err := ioutil.ReadFile(filepath.Clean(path))
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return data, err
 	}
