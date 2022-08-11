@@ -17,14 +17,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"gopkg.in/alecthomas/kingpin.v2"
+	_ "net/http/pprof"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
-  _ "net/http/pprof"
+	"gopkg.in/alecthomas/kingpin.v2"
 
-	"lustre_exporter/sources"
 	"lustre_exporter/log"
+	"lustre_exporter/sources"
 )
 
 var (

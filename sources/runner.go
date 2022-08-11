@@ -21,18 +21,21 @@ type worker struct {
   wg      sync.WaitGroup
   mu      sync.Mutex
   list    map[string]LustreSource
-	ctxs    []collectorCtx
+	ctxs    []*runnerCtx
 	creat   time.Time
 	start   time.Time
 	end     time.Time
-	results []*result
 }
 
-type result struct {
+type runnerCtx struct {
+  start  time.Time
+	end    time.Time
+	cost   time.Duration
 	name   string
 	result string
-	cost   time.Duration
+	ctx  collectorCtx
 }
+
 
 func newWorker(list map[string]LustreSource, r *runner) *worker{
 	return &worker{
@@ -47,19 +50,23 @@ func (w *worker)run() {
 	w.wg.Add(len(w.list))
   go func() {
 		for name, c := range w.list {
-			ctx := c.newCtx()
+			ctx := &runnerCtx{
+			  name  : name,
+				start : w.start,
+				ctx   : c.newCtx(),
+				result: "success",
+			}
 			w.ctxs = append(w.ctxs, ctx)
-			go func(name string, c LustreSource) {
-				err := ctx.collect()
-				duration := time.Since(w.start)
+			go func(ctx *runnerCtx) {
+				err := ctx.ctx.collect()
+				ctx.end   = time.Now()
+				ctx.cost  = ctx.end.Sub(ctx.start)
 				if err != nil {
-					log.Errorf("ERROR: %q source failed after %f seconds: %s", name, duration.Seconds(), err)
-					w.results = append(w.results, &result{name: name, result: "error", cost: duration })
-				} else {
-					w.results = append(w.results, &result{name: name, result: "success", cost: duration })
-				}
+					log.Errorf("ERROR: %q source failed after %f seconds: %s", ctx.name, ctx.cost.Seconds(), err)
+					ctx.result = "error"
+				} 
 				w.wg.Done()
-			}(name, c)
+			}(ctx)
 		}
 		w.wg.Wait()
 		w.end = time.Now()
@@ -73,17 +80,15 @@ func (w *worker)wait() {
 
 func (w *worker)release() {
 	for _, ctx := range w.ctxs {
-		ctx.release()
+		ctx.ctx.release()
 	}
 }
 
 func (w *worker)update(sv *prometheus.SummaryVec, ch chan<- prometheus.Metric) {
 	for _, ctx := range w.ctxs {
-		ctx.update(ch)
-	}
-
-	for _, result := range w.results {
-		sv.WithLabelValues(result.name, result.result).Observe(result.cost.Seconds())
+		start := time.Now()
+		ctx.ctx.update(ch)
+		sv.WithLabelValues(ctx.name, ctx.result).Observe(ctx.cost.Seconds() + time.Now().Sub(start).Seconds())
 	}
 	sv.Collect(ch)
 }
