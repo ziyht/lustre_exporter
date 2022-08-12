@@ -361,8 +361,28 @@ var jobStatsOperationSlice []multistatParsingStruct = []multistatParsingStruct{
 	}
 
 func (ctx *procfsV2Ctx)getJobStatsOperationMetrics(jobsStats map[string]map[string][]int64, promName string, helpText string) (metricList []lustreJobsMetric, err error) {
+	
+	var cur_needed_list = make([]multistatParsingStruct, 0, len(jobStatsOperationSlice))
+	var check_needed bool
+
 	for jobid, stats := range jobsStats {
-		for _, operation := range jobStatsOperationSlice {
+		if !check_needed{
+			for _, operation := range jobStatsOperationSlice {
+				vals, ok := stats[operation.pattern]
+				if !ok || len(vals) <= operation.index {
+					continue
+				}
+				cur_needed_list = append(cur_needed_list, operation)
+			}
+			check_needed = true
+		}
+
+		// that means all jobstats of current file not contains any needed operate because all jobstats are the same in a single file
+		if len(cur_needed_list) == 0 {
+			break
+		}
+
+		for _, operation := range cur_needed_list {
 			vals, ok := stats[operation.pattern]
 			if !ok || len(vals) <= operation.index {
 				continue
@@ -405,7 +425,14 @@ func (ctx *procfsV2Ctx)getJobStatsIOMetrics(jobsStats map[string]map[string][]in
 	operation := opMap[helpText]
 	for jobid, stats := range jobsStats {
 		vals, ok := stats[operation.pattern]
-		if !ok || len(vals) <= operation.index {
+
+		// if a pattern not exist, all jobStats will be the same, this should not happen
+		if !ok {
+			break
+		}
+
+		// invalid values, should not return any data for this job
+		if len(vals) <= 3 {
 			continue
 		}
 
