@@ -16,6 +16,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	_ "net/http/pprof"
 
@@ -152,6 +153,10 @@ func main() {
 	handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger()})
 
 	http.Handle(*metricsPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handler))
+	http.HandleFunc("/-/exit", func(w http.ResponseWriter, r *http.Request){
+		log.Infof("Exit(1) on remote call")
+		os.Exit(1)
+	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var num int
 		num, err = w.Write([]byte(`<html>

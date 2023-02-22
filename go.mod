@@ -10,7 +10,14 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
-require github.com/gammazero/deque v0.1.0 // indirect
+require (
+	github.com/alecthomas/assert v1.0.0 // indirect
+	github.com/alecthomas/colour v0.1.0 // indirect
+	github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142 // indirect
+	github.com/gammazero/deque v0.1.0 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/sergi/go-diff v1.2.0 // indirect
+)
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect

@@ -19,7 +19,7 @@ type  runner struct {
 type worker struct {
   r       *runner
   wg      sync.WaitGroup
-  mu      sync.Mutex
+  //mu      sync.Mutex
   list    map[string]LustreSource
 	ctxs    []*runnerCtx
 	creat   time.Time
@@ -88,7 +88,7 @@ func (w *worker)update(sv *prometheus.SummaryVec, ch chan<- prometheus.Metric) {
 	for _, ctx := range w.ctxs {
 		start := time.Now()
 		ctx.ctx.update(ch)
-		sv.WithLabelValues(ctx.name, ctx.result).Observe(ctx.cost.Seconds() + time.Now().Sub(start).Seconds())
+		sv.WithLabelValues(ctx.name, ctx.result).Observe(ctx.cost.Seconds() + time.Since(start).Seconds())
 	}
 	sv.Collect(ch)
 }

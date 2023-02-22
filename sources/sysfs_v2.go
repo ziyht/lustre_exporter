@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -15,7 +14,7 @@ type sysfsV2 struct {
 type sysfsV2Ctx struct {
 	s                  *lustreSysSource
 	fr                 *fileReader
-	lastover           time.Time
+	//lastover           time.Time
 	metrics            []prometheus.Metric
 }
 
@@ -56,7 +55,7 @@ func (ctx *sysfsV2Ctx)collect() (err error){
 		for _, path := range paths {
 			switch metric.filename {
 			case "health_check":
-				err = s.parseTextFile(metric.source, "health_check", path, directoryDepth, metric.helpText, metric.promName, func(nodeType string, nodeName string, name string, helpText string, value float64) {
+				err = ctx.parseTextFile(metric.source, "health_check", path, directoryDepth, metric.helpText, metric.promName, func(nodeType string, nodeName string, name string, helpText string, value float64) {
 					metrics = append(metrics, metric.metricFunc([]string{"component", "target"}, []string{nodeType, nodeName}, name, helpText, value))
 				})
 				if err != nil {

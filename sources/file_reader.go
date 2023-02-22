@@ -1,7 +1,7 @@
 package sources
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -38,7 +38,7 @@ func (fr *fileReader)readFileAsync(path string) {
 
 	fr.wg.Add(1)
 	fn := func() {
-		data, err := ioutil.ReadFile(path)
+		data, err :=  os.ReadFile(path)
 		if err == nil {
 			fr.mu.Lock()
 			defer fr.mu.Unlock()
@@ -70,7 +70,7 @@ func (fr *fileReader)readFile(path string) ([]byte, error) {
 		return data, nil
 	}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return data, err
 	}
