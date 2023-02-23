@@ -13,13 +13,13 @@ var sPool = &pool{
 	jobStatss: sync.Pool{ New: newJobStates },
 }
 
-func (p *pool)newJobState() *jobState{
-	return p.jobStats.Get().(*jobState)
-}
+// func (p *pool)newJobState() *jobState{
+// 	return p.jobStats.Get().(*jobState)
+// }
 
-func (p *pool)recycleJobState(d *jobState) {
-	p.jobStats.Put(d)
-}
+// func (p *pool)recycleJobState(d *jobState) {
+// 	p.jobStats.Put(d)
+// }
 
 func (p *pool)newJobStates() *[]jobState{
 	out := (p.jobStatss.Get().(*[]jobState))

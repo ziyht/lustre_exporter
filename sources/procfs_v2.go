@@ -3,7 +3,6 @@ package sources
 import (
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,14 +14,14 @@ import (
 )
 
 type procfsV2 struct {
-	reNum *regexp.Regexp
+	reNum   *regexp.Regexp
+	reSpace *regexp.Regexp
 }
 
 type procfsV2Ctx struct {
   s                  *lustreProcfsSource
 	fr                 *fileReader
 	filesJobStats      map[string]*[]jobState
-	//lastover           time.Time
 	metrics_           []prometheus.Metric
 }
 
@@ -35,7 +34,6 @@ func (v2 *procfsV2)newCtx(s  *lustreProcfsSource) *procfsV2Ctx{
 		filesJobStats: map[string]*[]jobState{},
 	}
 }
-
 
 func (ctx *procfsV2Ctx)update(ch chan<- prometheus.Metric) {
 	for _, m := range ctx.metrics_ {
@@ -73,8 +71,6 @@ func (ctx *procfsV2Ctx)collect() error {
 
 	ctx.prepareFiles()
 
-	var metrics []prometheus.Metric
-
 	for _, metric := range s.lustreProcMetrics {
 		directoryDepth = strings.Count(metric.filename, "/")
 		paths, err := ctx.fr.glob(filepath.Join(s.basePath, metric.path, metric.filename))
@@ -88,24 +84,14 @@ func (ctx *procfsV2Ctx)collect() error {
 			metricType = single
 			switch metric.filename {
 			case "brw_stats", "rpc_stats":
-				err = ctx.parseBRWStats(metric.source, "stats", path, directoryDepth, metric.helpText, metric.promName, metric.hasMultipleVals, func(nodeType string, brwOperation string, brwSize string, nodeName string, name string, helpText string, value float64, extraLabel string, extraLabelValue string) {
-					if extraLabelValue == "" {
-						metrics = append(metrics, metric.metricFunc([]string{"component", "target", "operation", "size"}, []string{nodeType, nodeName, brwOperation, brwSize}, name, helpText, value))
-					} else {
-						metrics = append(metrics, metric.metricFunc([]string{"component", "target", "operation", "size", extraLabel}, []string{nodeType, nodeName, brwOperation, brwSize, extraLabelValue}, name, helpText, value))
-					}
-				})
+			  basicLables := []string{"component", "target", "operation", "size"}
+				err = ctx.parseBRWStats(metric.source, "stats", path, directoryDepth, &metric, basicLables)
 				if err != nil {
 					return err
 				}
 			case "job_stats":
-				err = ctx.parseJobStats(metric.source, "job_stats", path, directoryDepth, metric.helpText, metric.promName, metric.hasMultipleVals, func(nodeType string, jobid string, nodeName string, name string, helpText string, value float64, extraLabel string, extraLabelValue string) {
-					if extraLabelValue == "" {
-						metrics = append(metrics, metric.metricFunc([]string{"component", "target", "jobid"}, []string{nodeType, nodeName, jobid}, name, helpText, value))
-					} else {
-						metrics = append(metrics, metric.metricFunc([]string{"component", "target", "jobid", extraLabel}, []string{nodeType, nodeName, jobid, extraLabelValue}, name, helpText, value))
-					}
-				})
+				basicLables := []string{"component", "target", "jobid"}
+				err = ctx.parseJobStats(metric.source, "job_stats", path, directoryDepth, &metric, basicLables)
 				if err != nil {
 					return err
 				}
@@ -117,21 +103,14 @@ func (ctx *procfsV2Ctx)collect() error {
 				} else if metric.filename == encryptPagePools {
 					metricType = encryptPagePools
 				}
-				err = ctx.parseFile(metric.source, metricType, path, directoryDepth, metric.helpText, metric.promName, metric.hasMultipleVals, func(nodeType string, nodeName string, name string, helpText string, value float64, extraLabel string, extraLabelValue string) {
-					if extraLabelValue == "" {
-						metrics = append(metrics, metric.metricFunc([]string{"component", "target"}, []string{nodeType, nodeName}, name, helpText, value))
-					} else {
-						metrics = append(metrics, metric.metricFunc([]string{"component", "target", extraLabel}, []string{nodeType, nodeName, extraLabelValue}, name, helpText, value))
-					}
-				})
+				basicLables := []string{"component", "target"}
+				err = ctx.parseFile(metric.source, metricType, path, directoryDepth, &metric, basicLables)
 				if err != nil {
 					return err
 				}
 			}
 		}
 	}
-
-	ctx.metrics_ = metrics
 
 	return nil
 }
@@ -147,7 +126,7 @@ var	brwStatsMetricBlocks = map[string]string{
 		offsetHelp:             "offset",
 	}
 
-func (ctx *procfsV2Ctx) parseBRWStats(nodeType string, metricType string, path string, directoryDepth int, helpText string, promName string, hasMultipleVals bool, handler func(string, string, string, string, string, string, float64, string, string)) (err error) {
+func (ctx *procfsV2Ctx) parseBRWStats(nodeType string, metricType string, path string, directoryDepth int, metric *lustreProcMetric, basicLables []string) (err error) {
 	_, nodeName, err := parseFileElements(path, directoryDepth)
 	if err != nil {
 		return err
@@ -158,29 +137,63 @@ func (ctx *procfsV2Ctx) parseBRWStats(nodeType string, metricType string, path s
 		return err
 	}
 	statsFile := string(statsFileBytes[:])
-	block := regexCaptureString("(?ms:^"+brwStatsMetricBlocks[helpText]+".*?(\n\n|\\z))", statsFile)
-	metricList, err := splitBRWStats(block)
-	if err != nil {
-		return err
-	}
+	block := regexCaptureString("(?ms:^"+brwStatsMetricBlocks[metric.helpText]+".*?(\n\n|\\z))", statsFile)
+
 	extraLabel := ""
 	extraLabelValue := ""
-	if hasMultipleVals {
+	if metric.hasMultipleVals {
 		extraLabel = "type"
 		pathElements := strings.Split(path, "/")
 		extraLabelValue = pathElements[len(pathElements)-3]
 	}
-	for _, item := range metricList {
-		value, err := strconv.ParseFloat(item.value, 64)
-		if err != nil {
-			return err
+
+	err = ctx.splitBRWStats(nodeType, nodeName, block, metric, basicLables, extraLabel, extraLabelValue)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ctx *procfsV2Ctx)splitBRWStats(nodeType string, nodeName string, statBlock string, metric *lustreProcMetric, lables []string, extraLable string, extraLableVal string) (err error) {
+	if len(statBlock) == 0 || statBlock == "" {
+		return nil
+	}
+
+	// Skip the first line of text as it doesn't contain any metrics
+	for _, line := range strings.Split(statBlock, "\n")[1:] {
+		if len(line) > 1 {
+			fields := strings.Fields(line)
+			// Lines are in the following format:
+			// [size] [# read RPCs] [relative read size (%)] [cumulative read size (%)] | [# write RPCs] [relative write size (%)] [cumulative write size (%)]
+			// [0]    [1]           [2]                      [3]                       [4] [5]           [6]                       [7]
+			if len(fields) >= 6 {
+				size, readRPCs, writeRPCs := fields[0], fields[1], fields[5]
+				size = strings.Replace(size, ":", "", -1)
+				size = convertToBytes(size)
+
+				read,  err := strconv.ParseFloat(readRPCs,  64); if err != nil { return err }
+				write, err := strconv.ParseFloat(writeRPCs, 64); if err != nil { return err }
+
+				ctx.appendMetrics(metric, lables, []string{nodeType, nodeName, "read" , size}, read , extraLable, extraLableVal)
+				ctx.appendMetrics(metric, lables, []string{nodeType, nodeName, "write", size}, write, extraLable, extraLableVal)
+			} else if len(fields) >= 1 {
+				size, rpcs := fields[0], fields[1]
+				size = strings.Replace(size, ":", "", -1)
+				size = convertToBytes(size)
+
+				rpc,  err := strconv.ParseFloat(rpcs,  64); if err != nil { return err }
+
+				ctx.appendMetrics(metric, lables, []string{nodeType, nodeName, "read" , size}, rpc , extraLable, extraLableVal)
+			} else {
+				continue
+			}
 		}
-		handler(nodeType, item.operation, convertToBytes(item.size), nodeName, promName, helpText, value, extraLabel, extraLabelValue)
 	}
 	return nil
 }
 
-func (ctx *procfsV2Ctx) parseFile(nodeType string, metricType string, path string, directoryDepth int, helpText string, promName string, hasMultipleVals bool, handler func(string, string, string, string, float64, string, string)) (err error) {
+func (ctx *procfsV2Ctx) parseFile(nodeType string, metricType string, path string, directoryDepth int, metric *lustreProcMetric, basicLables []string) (err error) {
 	_, nodeName, err := parseFileElements(path, directoryDepth)
 	if err != nil {
 		return err
@@ -195,31 +208,31 @@ func (ctx *procfsV2Ctx) parseFile(nodeType string, metricType string, path strin
 		if err != nil {
 			return err
 		}
-		handler(nodeType, nodeName, promName, helpText, convertedValue, "", "")
+		ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName}, convertedValue, "", "")
 	case stats, mdStats, encryptPagePools:
-		metricList, err := ctx.parseStatsFile(helpText, promName, path, hasMultipleVals)
+		metricList, err := ctx.parseStatsFile(path, nodeType, nodeName, metric, basicLables)
 		if err != nil {
 			return err
 		}
 
-		for _, metric := range metricList {
-			handler(nodeType, nodeName, metric.title, metric.help, metric.value, metric.extraLabel, metric.extraLabelValue)
+		for _, item := range metricList {
+			ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName}, item.value, item.extraLabel, item.extraLabelValue)
 		}
 	}
 	return nil
 }
 
-func (ctx *procfsV2Ctx)parseStatsFile(helpText string, promName string, path string, hasMultipleVals bool) (metricList []lustreStatsMetric, err error) {
+func (ctx *procfsV2Ctx)parseStatsFile(path string, nodeType string, nodeName string, metric *lustreProcMetric, basicLables []string) (metricList []lustreStatsMetric, err error) {
 	statsFileBytes, err := ctx.fr.readFile(path)
 	if err != nil {
 		return nil, err
 	}
 	statsFile := string(statsFileBytes[:])
 	var statsList []lustreStatsMetric
-	if hasMultipleVals {
-		statsList, err = getStatsOperationMetrics(statsFile, promName, helpText)
+	if metric.hasMultipleVals {
+		err = ctx.getStatsOperationMetrics(statsFile, nodeType, nodeName, metric, basicLables)
 	} else {
-		statsList, err = getStatsIOMetrics(statsFile, promName, helpText)
+		err = ctx.getStatsIOMetrics(statsFile, nodeType, nodeName, metric, basicLables)
 	}
 	if err != nil {
 		return nil, err
@@ -231,49 +244,162 @@ func (ctx *procfsV2Ctx)parseStatsFile(helpText string, promName string, path str
 	return metricList, nil
 }
 
-func (ctx *procfsV2Ctx) parseJobStats(nodeType string, metricType string, path string, directoryDepth int, helpText string, promName string, hasMultipleVals bool, handler func(string, string, string, string, string, float64, string, string)) (err error) {
+var	operationSlice = []multistatParsingStruct{
+		{pattern: "open",             index: 1},
+		{pattern: "close",            index: 1},
+		{pattern: "getattr",          index: 1},
+		{pattern: "setattr",          index: 1},
+		{pattern: "getxattr",         index: 1},
+		{pattern: "setxattr",         index: 1},
+		{pattern: "statfs",           index: 1},
+		{pattern: "seek",             index: 1},
+		{pattern: "readdir",          index: 1},
+		{pattern: "truncate",         index: 1},
+		{pattern: "alloc_inode",      index: 1},
+		{pattern: "removexattr",      index: 1},
+		{pattern: "unlink",           index: 1},
+		{pattern: "inode_permission", index: 1},
+		{pattern: "create",           index: 1},
+		{pattern: "get_info",         index: 1},
+		{pattern: "set_info_async",   index: 1},
+		{pattern: "connect",          index: 1},
+		{pattern: "ping",             index: 1},
+	}
+
+func (ctx *procfsV2Ctx)getStatsOperationMetrics(statsFile string, nodeType string, nodeName string, metric *lustreProcMetric, basicLables []string) (err error) {
+
+	// splits := strings.Split(statsFile, "\n")
+
+	// for _, split := range splits {
+	// 	bytesSplit := insProcfsV2.reSpace.Split(split, -1)
+	// 	if len(bytesSplit) != 2 {
+	// 		continue
+	// 	}
+	// 	val, err := strconv.ParseFloat(bytesSplit[1], 64)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName}, val, "operation", bytesSplit[0])
+	// }
+
+	// return nil
+
+	for _, operation := range operationSlice {
+		opStat := regexCaptureString(operation.pattern+" .*", statsFile)
+		if len(opStat) < 1 {
+			continue
+		}
+
+		bytesSplit := insProcfsV2.reSpace.Split(opStat, -1)
+		result, err := strconv.ParseFloat(bytesSplit[operation.index], 64)
+		if err != nil {
+			return err
+		}
+		ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName}, result, "operation", operation.pattern)
+	}
+	return nil
+}
+
+var bytesMap = map[string]multistatParsingStruct{
+		readSamplesHelp:       {pattern: "read_bytes .*",           index: 1},
+		readMinimumHelp:       {pattern: "read_bytes .*",           index: 4},
+		readMaximumHelp:       {pattern: "read_bytes .*",           index: 5},
+		readTotalHelp:         {pattern: "read_bytes .*",           index: 6},
+		writeSamplesHelp:      {pattern: "write_bytes .*",          index: 1},
+		writeMinimumHelp:      {pattern: "write_bytes .*",          index: 4},
+		writeMaximumHelp:      {pattern: "write_bytes .*",          index: 5},
+		writeTotalHelp:        {pattern: "write_bytes .*",          index: 6},
+		physicalPagesHelp:     {pattern: "physical pages: .*",      index: 2},
+		pagesPerPoolHelp:      {pattern: "pages per pool: .*",      index: 3},
+		maxPagesHelp:          {pattern: "max pages: .*",           index: 2},
+		maxPoolsHelp:          {pattern: "max pools: .*",           index: 2},
+		totalPagesHelp:        {pattern: "total pages: .*",         index: 2},
+		totalFreeHelp:         {pattern: "total free: .*",          index: 2},
+		maxPagesReachedHelp:   {pattern: "max pages reached: .*",   index: 3},
+		growsHelp:             {pattern: "grows: .*",               index: 1},
+		growsFailureHelp:      {pattern: "grows failure: .*",       index: 2},
+		shrinksHelp:           {pattern: "shrinks: .*",             index: 1},
+		cacheAccessHelp:       {pattern: "cache access: .*",        index: 2},
+		cacheMissingHelp:      {pattern: "cache missing: .*",       index: 2},
+		lowFreeMarkHelp:       {pattern: "low free mark: .*",       index: 3},
+		maxWaitQueueDepthHelp: {pattern: "max waitqueue depth: .*", index: 3},
+		outOfMemHelp:          {pattern: "out of mem: .*",          index: 3},
+	}
+
+func (ctx *procfsV2Ctx)getStatsIOMetrics(statsFile string, nodeType string, nodeName string, metric *lustreProcMetric, basicLables []string) (err error) {
+	// bytesSplit is in the following format:
+	// bytesString: {name} {number of samples} 'samples' [{units}] {minimum} {maximum} {sum}
+	// bytesSplit:   [0]    [1]                 [2]       [3]       [4]       [5]       [6]
+
+	pattern := bytesMap[metric.helpText].pattern
+	bytesString := regexCaptureString(pattern, statsFile)
+	if len(bytesString) < 1 {
+		return nil
+	}
+
+	bytesSplit := insProcfsV2.reSpace.Split(bytesString, -1)
+	result, err := strconv.ParseFloat(bytesSplit[bytesMap[metric.helpText].index], 64)
+	if err != nil {
+		return err
+	}
+
+	ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName}, result, "", "")
+
+	return nil
+}
+
+func (ctx *procfsV2Ctx) parseJobStats(nodeType string, metricType string, path string, directoryDepth int, metric *lustreProcMetric, basicLables []string) (err error) {
 	_, nodeName, err := parseFileElements(path, directoryDepth)
 	if err != nil {
 		return err
 	}
 
-	metricList, err := ctx.parseJobStatsText(path, promName, helpText, hasMultipleVals)
+	err = ctx.parseJobStatsText(path, nodeType, nodeName, metric, basicLables)
 	if err != nil {
 		return err
 	}
 
-	for _, item := range metricList {
-		handler(nodeType, item.jobID, nodeName, item.lustreStatsMetric.title, item.lustreStatsMetric.help, item.lustreStatsMetric.value, item.lustreStatsMetric.extraLabel, item.lustreStatsMetric.extraLabelValue)
-	}
 	return nil
+}
+
+func (ctx *procfsV2Ctx)appendMetrics(metric *lustreProcMetric, basicLables []string, lableVals []string, val float64, extraLable string, extraLableVal string) {
+	if extraLable != "" {
+		basicLables = append(basicLables, extraLable)
+		lableVals   = append(lableVals, extraLableVal)
+	}
+	ctx.metrics_ = append(ctx.metrics_, metric.metricFunc(basicLables, lableVals, metric.promName, metric.helpText, val) )
+}
+
+var jobStateKeys  = [22]string{
+  "open",
+  "close",
+  "mknod",
+  "link",
+  "unlink",
+  "mkdir",
+  "rmdir",
+  "rename",
+  "getattr",
+  "setattr",
+  "getxattr",
+  "setxattr",
+  "statfs",
+  "sync",
+  "samedir_rename",
+  "crossdir_rename",
+  "punch",
+  "destroy",
+  "create",
+  "get_info",
+  "set_info",
+  "quotactl",
 }
 
 type jobState struct {
   jobid           string
-	readbytes       [4]int64   `key:"read_bytes"`
-	writebytes      [4]int64   `key:"write_bytes"`
-	open            int64      `key:"open"`
-	close           int64      `key:"close"`
-	mknod           int64      `key:"mknod"`
-	link            int64      `key:"link"`
-	unlink          int64      `key:"unlink"`
-	mkdir           int64      `key:"mkdir"`
-	rmdir           int64      `key:"rmdir"`
-	rename          int64      `key:"rename"`
-	getattr         int64      `key:"getattr"`
-	setattr         int64      `key:"setattr"`
-	getxattr        int64      `key:"getxattr"`
-	setxattr        int64      `key:"setxattr"`
-	statfs          int64      `key:"statfs"`
-	sync            int64      `key:"sync"`
-	samedir_rename  int64      `key:"samedir_rename"`
-	crossdir_rename int64      `key:"crossdir_rename"`
-	punch           int64      `key:"punch"`
-	destroy         int64      `key:"destroy"`
-	create          int64      `key:"create"`
-	get_info        int64      `key:"get_info"`
-	set_info        int64      `key:"set_info"`
-	quotactl        int64      `key:"quotactl"`
+	readbytes       [4]int64
+	writebytes      [4]int64
+	vals            [22]int64
 }
 
 func newJobState() any{
@@ -326,28 +452,28 @@ func (js *jobState)parsingFromText(content string)error{
 		switch key {
 			case "read_bytes"     : cnt, err = parsingNums(&js.readbytes , line); if cnt <= 3 { err = fmt.Errorf("invalid data for %s", key) }
 			case "write_bytes"    : cnt, err = parsingNums(&js.writebytes, line); if cnt <= 3 { err = fmt.Errorf("invalid data for %s", key) }
-			case "open"           : err= parsingNumAt(&js.open ,    line)
-			case "close"          : err= parsingNumAt(&js.close,    line) 
-			case "mknod"          : err= parsingNumAt(&js.mknod,    line) 
-			case "link"           : err= parsingNumAt(&js.link,     line) 
-			case "unlink"         : err= parsingNumAt(&js.unlink,   line) 
-			case "mkdir"          : err= parsingNumAt(&js.mkdir,    line) 
-			case "rmdir"          : err= parsingNumAt(&js.rmdir,    line) 
-			case "rename"         : err= parsingNumAt(&js.rename,   line) 
-			case "getattr"        : err= parsingNumAt(&js.getattr,  line) 
-			case "setattr"        : err= parsingNumAt(&js.setattr,  line) 
-			case "getxattr"       : err= parsingNumAt(&js.getxattr, line) 
-			case "setxattr"       : err= parsingNumAt(&js.setxattr, line) 
-			case "statfs"         : err= parsingNumAt(&js.statfs,   line) 
-			case "sync"           : err= parsingNumAt(&js.sync,     line) 
-			case "samedir_rename" : err= parsingNumAt(&js.samedir_rename,  line) 
-			case "crossdir_rename": err= parsingNumAt(&js.crossdir_rename, line) 
-			case "punch"          : err= parsingNumAt(&js.punch,    line) 
-			case "destroy"        : err= parsingNumAt(&js.destroy,  line) 
-			case "create"         : err= parsingNumAt(&js.create,   line) 
-			case "get_info"       : err= parsingNumAt(&js.get_info, line) 
-			case "set_info"       : err= parsingNumAt(&js.set_info, line) 
-			case "quotactl"       : err= parsingNumAt(&js.quotactl, line) 
+			case "open"           : js.vals[ 0], err= parsingInt64(line)
+			case "close"          : js.vals[ 1], err= parsingInt64(line)
+			case "mknod"          : js.vals[ 2], err= parsingInt64(line)
+			case "link"           : js.vals[ 3], err= parsingInt64(line)
+			case "unlink"         : js.vals[ 4], err= parsingInt64(line)
+			case "mkdir"          : js.vals[ 5], err= parsingInt64(line)
+			case "rmdir"          : js.vals[ 6], err= parsingInt64(line)
+			case "rename"         : js.vals[ 7], err= parsingInt64(line)
+			case "getattr"        : js.vals[ 8], err= parsingInt64(line)
+			case "setattr"        : js.vals[ 9], err= parsingInt64(line)
+			case "getxattr"       : js.vals[10], err= parsingInt64(line)
+			case "setxattr"       : js.vals[11], err= parsingInt64(line)
+			case "statfs"         : js.vals[12], err= parsingInt64(line)
+			case "sync"           : js.vals[13], err= parsingInt64(line)
+			case "samedir_rename" : js.vals[14], err= parsingInt64(line)
+			case "crossdir_rename": js.vals[15], err= parsingInt64(line)
+			case "punch"          : js.vals[16], err= parsingInt64(line)
+			case "destroy"        : js.vals[17], err= parsingInt64(line)
+			case "create"         : js.vals[18], err= parsingInt64(line)
+			case "get_info"       : js.vals[19], err= parsingInt64(line)
+			case "set_info"       : js.vals[20], err= parsingInt64(line)
+			case "quotactl"       : js.vals[21], err= parsingInt64(line)
 		} 
 		if err != nil {
 			return fmt.Errorf("parsing failed for key '%s' of jobid '%s', line is: %s", key, jobid, line)
@@ -375,36 +501,33 @@ func parsingNums(dest *[4]int64, input string)(int, error){
 	return cnt, nil
 }
 
-func parsingNumAt(dest *int64, input string)(error){
+func parsingInt64(input string)(int64, error){
 	numStrs := insProcfsV2.reNum.FindAllString(input, 1)
 	if len(numStrs) < 1 {
-		return fmt.Errorf("can not find any num strings")
+		return 0, fmt.Errorf("can not find any num strings")
 	}
 
 	num, err := strconv.ParseInt(strings.TrimSpace(numStrs[0]), 10, 64)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	*dest = num
 
-	return nil
+	return num, nil
 }
 
-func (ctx *procfsV2Ctx)parseJobStatsText(path string, promName string, helpText string, hasMultipleVals bool) (metricList []lustreJobsMetric, err error){
-
-	var jobList []lustreJobsMetric
+func (ctx *procfsV2Ctx)parseJobStatsText(path string, nodeType string, nodeName string, metric *lustreProcMetric, basicLables []string) (err error){
 
 	jobsStats, ok := ctx.filesJobStats[path]
 	if !ok {
 		jobsStats = sPool.newJobStates()
 		jobStatsBytes, err := ctx.fr.readFile(path)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		jobStatsContent := string(jobStatsBytes[:])
 		splits := strings.Split(jobStatsContent, "- ")
 		if len(splits) <= 1{
-			return nil, nil
+			return nil
 		}
 		jobs := splits[1:]
 
@@ -420,15 +543,13 @@ func (ctx *procfsV2Ctx)parseJobStatsText(path string, promName string, helpText 
 		ctx.filesJobStats[path] = jobsStats
 	}
 
-	if hasMultipleVals {
-		jobList, _ = ctx.getJobStatsOperationMetrics(*jobsStats, promName, helpText)
+	if metric.hasMultipleVals {
+		ctx.getJobStatsOperationMetrics(*jobsStats, nodeType, nodeName, metric, basicLables)
 	} else {
-		jobList, _ = ctx.getJobStatsIOMetrics(*jobsStats, promName, helpText)
+		ctx.getJobStatsIOMetrics(*jobsStats, nodeType, nodeName, metric, basicLables)
 	}
-	if jobList != nil {
-		metricList = jobList
-	}
-	return metricList, nil
+
+	return nil
 }
 
 func getJobID(line string) (string, error) {
@@ -445,6 +566,7 @@ func getJobID(line string) (string, error) {
 	return getValidUtf8String(strings.TrimSpace(line[idx+len("job_id:"):idx2])), nil
 }
 
+// deprecated, not used now
 func (ctx *procfsV2Ctx)parsingJobStats(job string) (string, map[string][]int64, error) {
 
 	lines := strings.Split(job, "\n")
@@ -483,34 +605,22 @@ func (ctx *procfsV2Ctx)parsingJobStats(job string) (string, map[string][]int64, 
 	return jobid, j, nil
 }
 
-func (ctx *procfsV2Ctx)getJobStatsOperationMetrics(jobsStats []jobState, promName string, helpText string) (metricList []lustreJobsMetric, err error) {
+func (ctx *procfsV2Ctx)getJobStatsOperationMetrics(jobsStats []jobState, nodeType string, nodeName string, metric *lustreProcMetric, basicLables []string) (err error) {
 
-	for _, js := range jobsStats {
-		var typeInfo = reflect.TypeOf(js)
-    var valInfo = reflect.ValueOf(js)
-    num := typeInfo.NumField()
-		for i := 0; i < num; i++ {
-			key := typeInfo.Field(i).Tag.Get("key")
-			
-			if key == "" || key == "read_bytes" || key == "write_bytes" {
+	basicLables = append(basicLables, "operation")
+
+	for i := range jobsStats {
+		js  := &jobsStats[i]
+		cnt := len(jobStateKeys)
+		for j := 0; j < cnt; j++ {
+			if js.vals[j] < 0 {
 				continue
 			}
-			val := valInfo.Field(i).Int()
-			if val < 0 {
-				continue
-			}
-
-			metricList = append(metricList, lustreJobsMetric{js.jobid, lustreStatsMetric{
-				title:           promName,
-				help:            helpText,
-				value:           float64(val),
-				extraLabel:      "operation",
-				extraLabelValue: key,
-			}})
+			ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName, js.jobid, jobStateKeys[j]}, float64(js.vals[j]), "", "")
 		}
 	}
 
-	return metricList, err
+	return
 }
 
 var jobStatsMultistatParsingStruct map[string]multistatParsingStruct = map[string]multistatParsingStruct{
@@ -524,38 +634,24 @@ var jobStatsMultistatParsingStruct map[string]multistatParsingStruct = map[strin
 		writeTotalHelp:   {index: 3, pattern: "write_bytes"},
 	}
 
-func (ctx *procfsV2Ctx)getJobStatsIOMetrics(jobsStats []jobState, promName string, helpText string) (metricList []lustreJobsMetric, err error){
+func (ctx *procfsV2Ctx)getJobStatsIOMetrics(jobsStats []jobState, nodeType string, nodeName string, metric *lustreProcMetric, basicLables []string) (err error){
 	// opMap matches the given helpText value with the placement of the numeric fields within each metric line.
 	// For example, the number of samples is the first number in the line and has a helpText of readSamplesHelp,
 	// hence the 'index' value of 0. 'pattern' is the regex capture pattern for the desired line.
 	opMap := jobStatsMultistatParsingStruct
 	// If the metric isn't located in the map, don't try to parse a value for it.
-	if _, exists := opMap[helpText]; !exists {
-		return nil, nil
+	if _, exists := opMap[metric.helpText]; !exists {
+		return nil
 	}
 
-	operation := opMap[helpText]
+	operation := opMap[metric.helpText]
 	for _, js := range jobsStats {
 		if operation.pattern == "read_bytes" {
-			l := lustreStatsMetric{
-				title:           promName,
-				help:            helpText,
-				value:           float64(js.readbytes[operation.index]),
-				extraLabel:      "",
-				extraLabelValue: "",
-			}
-
-			metricList = append(metricList, lustreJobsMetric{js.jobid, l})
+			ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName, js.jobid}, float64(js.readbytes[operation.index]), "", "")
+			continue
 		}
 		if operation.pattern == "write_bytes" {
-			l := lustreStatsMetric{
-				title:           promName,
-				help:            helpText,
-				value:           float64(js.writebytes[operation.index]),
-				extraLabel:      "",
-				extraLabelValue: "",
-			}
-			metricList = append(metricList, lustreJobsMetric{js.jobid, l})
+			ctx.appendMetrics(metric, basicLables, []string{nodeType, nodeName, js.jobid}, float64(js.writebytes[operation.index]), "", "")
 		}
 	}
 
@@ -563,6 +659,7 @@ func (ctx *procfsV2Ctx)getJobStatsIOMetrics(jobsStats []jobState, promName strin
 }
 
 func init(){
-	insProcfsV2.reNum = regexp.MustCompile(`[0-9]*\.[0-9]+|[0-9]+`)
+	insProcfsV2.reNum   = regexp.MustCompile(`[0-9]*\.[0-9]+|[0-9]+`)
+	insProcfsV2.reSpace = regexp.MustCompile(` +`)
 	jobStateInitVal.__init()
 }
