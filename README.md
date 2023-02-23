@@ -2,10 +2,26 @@
 
 rebuild from HewlettPackard's [LustreExporter](https://github.com/HewlettPackard/lustre_exporter)
 
-new functions:
-1. add v2 vesion collect logic(default)  
-    1. using cache to skip parsing data via read and parsing file repeatedly, it can be execute 7-10x faster than old version for large files parsing  
+This project was created because the original project is no longer maintained, and to some extent, the performance of the original version is insufficient, sometimes causing the collecting process to time out.
+
+In case of this, we focus on performance optimization when rebuiding this new project.
+
+Of course, we also retain the processing logic of the old version, to ensure the correctness of the new version of the collection logic by comparing the data collected by the old one.
+
+New Functions:
+1. Add v2 vesion collect logic(default)  
+    1. do some performance optimization, can execute 7-10x faster than old version for large files parsing  
+       * using cache to skip read and parsing file repeatedly  
+       * reduce regexp-based text processing 
     2. add limitation of runtimes(default 4), if runtimes reach limit, the new request will wait and get data from the prev last request
+
+New Falgs:
+* --collector.path.proc="/proc"
+* --collector.path.sys="/sys"
+* --collector.collect.ver="v2"  
+  default is 'v2', it will change the interval collecting logic to old when != 'v2'
+* --collector.maxWorker=4  
+  max runtime can create in the same time for v2 version
 
 
 ## Getting

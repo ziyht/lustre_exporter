@@ -14,7 +14,7 @@
 package sources
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -164,7 +164,7 @@ func (s *lustreProcsysSource) parseFile(nodeType string, metricType string, path
 	}
 	switch metricType {
 	case single:
-		value, err := ioutil.ReadFile(filepath.Clean(path))
+		value, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func (s *lustreProcsysSource) parseFile(nodeType string, metricType string, path
 		}
 		handler(nodeType, nodeName, promName, helpText, convertedValue)
 	case stats:
-		statsFileBytes, err := ioutil.ReadFile(filepath.Clean(path))
+		statsFileBytes, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			return err
 		}

@@ -14,7 +14,7 @@
 package sources
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -99,7 +99,7 @@ func (s *lustreSysSource) parseTextFile(nodeType string, metricType string, path
 	if err != nil {
 		return err
 	}
-	fileBytes, err := ioutil.ReadFile(filepath.Clean(path))
+	fileBytes, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return err
 	}
