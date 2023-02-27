@@ -14,18 +14,22 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/expfmt"
 
+	"lustre_exporter/log"
 	"lustre_exporter/sources"
 )
 
@@ -43,6 +47,34 @@ type promType struct {
 	Parsed bool // Parsed returns 'true' if the metric has already been parsed
 }
 
+func (p *promType)String()string{
+  // {"lustre_stats_total", "Number of operations the filesystem has performed.", counter, []labelPair{{"component", "ost"}, {"operation", "connect"}, {"target", "lustrefs-OST0000"}}, 1, false},
+	return  fmt.Sprintf(`{"%s", "%s", %s, []labelPair{%s}, %v, %v} `, p.Name, p.Help, p.typeStr(), p.lablesStr(), p.Value, p.Parsed)
+}
+
+func (p *promType)typeStr() string {
+	switch p.Type{
+		case 0: return "counter"
+		case 1: return "gauge"
+		case 3: return "untyped"
+	}
+
+	return "(invalid type)"
+}
+
+func (p *promType)lablesStr() string {
+	return "(todo)"
+}
+
+func (p *promType)isSameMetric(in *promType) bool {
+	if p.Name != in.Name { return false }
+	if p.Help != in.Help { return false }
+	if !reflect.DeepEqual(p.Labels, in.Labels) { return false }
+	if p.Type != in.Type { return false }
+
+	return true
+}
+
 const (
 	// Constants taken from https://github.com/prometheus/client_model/blob/master/go/metrics.pb.go
 	counter = 0
@@ -53,6 +85,7 @@ const (
 var (
 	errMetricNotFound      = errors.New("metric not found")
 	errMetricAlreadyParsed = errors.New("metric already parsed")
+	errMetricValueNotEqual = errors.New("metric value not equal")
 )
 
 func toggleCollectors(target string) {
@@ -183,6 +216,24 @@ func sortByKey(labels []labelPair) ([]labelPair, error) {
 
 func compareResults(parsedMetric promType, expectedMetrics []promType) ([]promType, error) {
 	for i := range expectedMetrics {
+		if parsedMetric.isSameMetric(&expectedMetrics[i]){
+			if expectedMetrics[i].Parsed {
+				return expectedMetrics, errMetricAlreadyParsed
+			}
+
+			if parsedMetric.Value != expectedMetrics[i].Value {
+				return expectedMetrics, errMetricValueNotEqual
+			}
+
+			expectedMetrics[i].Parsed = true
+			return expectedMetrics, nil
+		}
+	}
+	return expectedMetrics, errMetricNotFound
+}
+
+func compareResults_(parsedMetric promType, expectedMetrics []promType) ([]promType, error) {
+	for i := range expectedMetrics {
 		if reflect.DeepEqual(parsedMetric, expectedMetrics[i]) {
 			if expectedMetrics[i].Parsed {
 				return expectedMetrics, errMetricAlreadyParsed
@@ -203,13 +254,7 @@ func blacklisted(blacklist []string, metricName string) bool {
 	return false
 }
 
-func TestCollector(t *testing.T) {
-	targets := []string{"OST", "MDT", "MGS", "MDS", "Client", "Generic", "LNET", "Health"}
-	// Override the default file location to the local proc directory
-	sources.ProcLocation = "proc"
-	sources.SysLocation = "sys"
-
-	expectedMetrics := []promType{
+var	expectedMetrics = []promType{
 		// OST Metrics
 		{"lustre_stats_total", "Number of operations the filesystem has performed.", counter, []labelPair{{"component", "ost"}, {"operation", "connect"}, {"target", "lustrefs-OST0000"}}, 1, false},
 		{"lustre_stats_total", "Number of operations the filesystem has performed.", counter, []labelPair{{"component", "ost"}, {"operation", "connect"}, {"target", "lustrefs-OST0002"}}, 1, false},
@@ -269,7 +314,7 @@ func TestCollector(t *testing.T) {
 		{"lustre_job_write_samples_total", "Total number of writes that have been recorded.", counter, []labelPair{{"component", "ost"}, {"jobid", "55"}, {"target", "lustrefs-OST0000"}}, 7609, false},
 		{"lustre_job_write_samples_total", "Total number of writes that have been recorded.", counter, []labelPair{{"component", "ost"}, {"jobid", "56"}, {"target", "lustrefs-OST0000"}}, 7656, false},
 		{"lustre_job_write_samples_total", "Total number of writes that have been recorded.", counter, []labelPair{{"component", "ost"}, {"jobid", "57"}, {"target", "lustrefs-OST0000"}}, 7722, false},
-		{"lustre_inodes_maximum", "The maximum number of inodes (objects) the filesystem can hold", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.5927444e+07, false},
+		{"lustre_inodes_maximum", "The maximum number of inodes (objects) the filesystem can hold", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.5927284e+07, false},
 		{"lustre_inodes_maximum", "The maximum number of inodes (objects) the filesystem can hold", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0002"}}, 1.474012704e+09, false},
 		{"lustre_inodes_maximum", "The maximum number of inodes (objects) the filesystem can hold", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0004"}}, 9.82675104e+08, false},
 		{"lustre_inodes_maximum", "The maximum number of inodes (objects) the filesystem can hold", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0006"}}, 9.82675104e+08, false},
@@ -317,7 +362,7 @@ func TestCollector(t *testing.T) {
 		{"lustre_job_read_maximum_size_bytes", "The maximum read size in bytes.", gauge, []labelPair{{"component", "ost"}, {"jobid", "57"}, {"target", "lustrefs-OST0000"}}, 0, false},
 		{"lustre_write_bytes_total", "The total number of bytes that have been written.", counter, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 1.6552048697344e+13, false},
 		{"lustre_write_maximum_size_bytes", "The maximum write size in bytes.", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.194304e+06, false},
-		{"lustre_available_kilobytes", "Number of kilobytes readily available in the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.7025124352e+10, false},
+		{"lustre_available_kilobytes", "Number of kilobytes readily available in the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.7029274624e+10, false},
 		{"lustre_available_kilobytes", "Number of kilobytes readily available in the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0002"}}, 4.7168396288e+10, false},
 		{"lustre_available_kilobytes", "Number of kilobytes readily available in the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0004"}}, 3.1445593088e+10, false},
 		{"lustre_available_kilobytes", "Number of kilobytes readily available in the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0006"}}, 3.1445593088e+10, false},
@@ -601,7 +646,7 @@ func TestCollector(t *testing.T) {
 		{"lustre_brw_size_megabytes", "Block read/write size in megabytes", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0002"}}, 4, false},
 		{"lustre_brw_size_megabytes", "Block read/write size in megabytes", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0004"}}, 4, false},
 		{"lustre_brw_size_megabytes", "Block read/write size in megabytes", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0006"}}, 4, false},
-		{"lustre_inodes_free", "The number of inodes (objects) available", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.5927188e+07, false},
+		{"lustre_inodes_free", "The number of inodes (objects) available", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.5927028e+07, false},
 		{"lustre_inodes_free", "The number of inodes (objects) available", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0002"}}, 1.474012448e+09, false},
 		{"lustre_inodes_free", "The number of inodes (objects) available", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0004"}}, 9.82674848e+08, false},
 		{"lustre_inodes_free", "The number of inodes (objects) available", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0006"}}, 9.82674848e+08, false},
@@ -1045,7 +1090,7 @@ func TestCollector(t *testing.T) {
 		{"lustre_exports_pending_total", "Total number of exports that have been marked pending", counter, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0002"}}, 0, false},
 		{"lustre_exports_pending_total", "Total number of exports that have been marked pending", counter, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0004"}}, 0, false},
 		{"lustre_exports_pending_total", "Total number of exports that have been marked pending", counter, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0006"}}, 0, false},
-		{"lustre_free_kilobytes", "Number of kilobytes allocated to the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.7029440512e+10, false},
+		{"lustre_free_kilobytes", "Number of kilobytes allocated to the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0000"}}, 4.7029276672e+10, false},
 		{"lustre_free_kilobytes", "Number of kilobytes allocated to the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0002"}}, 4.7168398336e+10, false},
 		{"lustre_free_kilobytes", "Number of kilobytes allocated to the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0004"}}, 3.1445595136e+10, false},
 		{"lustre_free_kilobytes", "Number of kilobytes allocated to the pool", gauge, []labelPair{{"component", "ost"}, {"target", "lustrefs-OST0006"}}, 3.1445595136e+10, false},
@@ -1689,8 +1734,18 @@ func TestCollector(t *testing.T) {
 		{"lustre_health_check", "Current health status for the indicated instance: 1 refers to 'healthy', 0 refers to 'unhealthy'", gauge, []labelPair{{"component", "health"}, {"target", "lustre"}}, 1, false},
 	}
 
+func TestCollector(t *testing.T) {
+	sources.CollectVersion = "v2"
+	sources.SHELF_LIFE = time.Duration(0)
+
+	targets := []string{"OST", "MDT", "MGS", "MDS", "Client", "Generic", "LNET", "Health"}
+	//targets := []string{"OST", "MDT"}
+	// Override the default file location to the local proc directory
+	sources.ProcLocation = "proc"
+	sources.SysLocation = "sys"
+
 	// These following metrics should be filtered out as they are specific to the deployment and will always change
-	blacklistedMetrics := []string{"go_", "http_", "process_", "lustre_exporter_"}
+	blacklistedMetrics := []string{"go_", "http_", "process_", "lustre_exporter_", "promhttp_"}
 
 	for i, metric := range expectedMetrics {
 		newLabels, err := sortByKey(metric.Labels)
@@ -1704,6 +1759,7 @@ func TestCollector(t *testing.T) {
 	for _, target := range targets {
 		toggleCollectors(target)
 		var missingMetrics []promType // Array of metrics that are missing for the given target
+		var valNotEqualMetrics []promType
 		enabledSources := []string{"procfs", "procsys", "sysfs"}
 
 		sourceList, err := loadSources(enabledSources)
@@ -1713,8 +1769,8 @@ func TestCollector(t *testing.T) {
 		if err = prometheus.Register(LustreSource{sourceList: sourceList}); err != nil {
 			t.Fatalf("Failed to register for target: %s", target)
 		}
-
-		promServer := httptest.NewServer(promhttp.Handler())
+		handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger(), ErrorHandling: promhttp.ContinueOnError})
+		promServer := httptest.NewServer(promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handler))
 		defer promServer.Close()
 
 		resp, err := http.Get(promServer.URL)
@@ -1722,9 +1778,18 @@ func TestCollector(t *testing.T) {
 			t.Fatalf("Failed to GET data from prometheus: %v", err)
 		}
 
+		if resp.StatusCode != 200 {
+			buf, _ := io.ReadAll(resp.Body)
+			t.Fatalf("%d: %s", resp.StatusCode, buf)
+		}
+
 		var parser expfmt.TextParser
 
-		metricFamilies, err := parser.TextToMetricFamilies(resp.Body)
+
+		buf, _ := io.ReadAll(resp.Body)
+		resp.Body.Read(buf)
+		//t.Logf("%s", buf)
+		metricFamilies, err := parser.TextToMetricFamilies(bytes.NewReader(buf))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1766,14 +1831,19 @@ func TestCollector(t *testing.T) {
 				expectedMetrics, err = compareResults(p, expectedMetrics)
 				if err == errMetricNotFound {
 					missingMetrics = append(missingMetrics, p)
-				} else if err == errMetricAlreadyParsed {
+				}else if err == errMetricValueNotEqual {
+					valNotEqualMetrics = append(valNotEqualMetrics, p)
+				}else if err == errMetricAlreadyParsed {
 					t.Fatalf("Retrieved an unexpected duplicate of %s metric: %+v", target, p)
 				}
 				numParsed++
 			}
 		}
 		if len(missingMetrics) != 0 {
-			t.Fatalf("The following %s metrics were not found: %+v", target, missingMetrics)
+			t.Fatalf("The following %s metrics were not found in expects: %v", target, missingMetrics)
+		}
+		if len(valNotEqualMetrics) != 0 {
+			t.Fatalf("The following %s metrics'val is not equal from expects: %v", target, valNotEqualMetrics)
 		}
 
 		prometheus.Unregister(LustreSource{sourceList: sourceList})

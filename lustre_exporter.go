@@ -150,7 +150,7 @@ func main() {
 	}
 
 	prometheus.MustRegister(LustreSource{sourceList: sourceList})
-	handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger()})
+	handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger(), ErrorHandling: promhttp.ContinueOnError})
 
 	http.Handle(*metricsPath, promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, handler))
 	http.HandleFunc("/-/exit", func(w http.ResponseWriter, r *http.Request){

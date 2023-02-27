@@ -9,6 +9,7 @@ import (
 )
 
 var MAX_WORKER = 4
+var SHELF_LIFE = time.Second
 
 type  runner struct {
 	mu          sync.Mutex
@@ -150,8 +151,8 @@ func (r *runner)updateV2(list map[string]LustreSource, sv *prometheus.SummaryVec
 	now := time.Now()
 	lastSuccess := r.lastSuccess
 	if lastSuccess != nil {
-	  // return directly if collect over in 1 second
-		if now.Sub(lastSuccess.end) <= time.Second {
+	  // return directly if last collecting over in SHELF_LIFE (default 1s)
+		if now.Sub(lastSuccess.end) <= SHELF_LIFE {
 			lastSuccess.update(sv, ch)
 			return
 		}
