@@ -96,7 +96,8 @@ func main() {
 		procPath            = kingpin.Flag("collector.path.proc", "Path to collect data from proc").Default("/proc").String()
 		sysPath             = kingpin.Flag("collector.path.sys" , "Path to collect data from sys").Default("/sys").String()
 		collectVer          = kingpin.Flag("collector.collect.ver" , "collect version").Default("v2").String()
-		maxWorker           = kingpin.Flag("collector.maxWorker"   , "max runtime can create in the same time, only support for v2").Default("4").Int()
+		workers             = kingpin.Flag("collector.v2.workers", "max collecting workers can create in the same time").Default("4").Int()
+		shelflife           = kingpin.Flag("collector.v2.shelflife", "data shelf life, no repeated collection during the shelf life").Default("1s").Duration()
 	)
 
 	kingpin.Parse()
@@ -131,11 +132,14 @@ func main() {
 	}
 	log.Infof(" - Collect Ver: %s", sources.CollectVersion)
 
-	sources.MAX_WORKER = *maxWorker
+	sources.MAX_WORKER = *workers
 	if sources.MAX_WORKER <= 0 {
 		sources.MAX_WORKER = 4
 	}
-	log.Infof(" - Max Worker : %d", sources.MAX_WORKER)
+	log.Infof(" - V2 Max Worker : %d", sources.MAX_WORKER)
+
+	sources.SHELF_LIFE = *shelflife
+	log.Infof(" - V2 Shelf Life : %s", sources.SHELF_LIFE)
 
 	enabledSources := []string{"procfs", "procsys", "sysfs"}
 

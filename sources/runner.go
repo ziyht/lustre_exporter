@@ -152,7 +152,8 @@ func (r *runner)updateV2(list map[string]LustreSource, sv *prometheus.SummaryVec
 	lastSuccess := r.lastSuccess
 	if lastSuccess != nil {
 	  // return directly if last collecting over in SHELF_LIFE (default 1s)
-		if now.Sub(lastSuccess.end) <= SHELF_LIFE {
+		delta := now.Sub(lastSuccess.end)
+		if delta >= 0 && delta <= SHELF_LIFE {
 			lastSuccess.update(sv, ch)
 			return
 		}

@@ -18,10 +18,12 @@ New Functions:
 New Falgs:
 * --collector.path.proc="/proc"
 * --collector.path.sys="/sys"
-* --collector.collect.ver="v2"  
+* --collector.collect.ver="v2"
   default is 'v2', it will change the interval collecting logic to old when != 'v2'
-* --collector.maxWorker=4  
-  max runtime can create in the same time for v2 version
+* --collector.v2.maxWorker=4
+  max collecting workers can create in the same time, parallel setting
+* --collector.v2.shelflife=1s
+  the data shelf life, not raise repeated collection during the shelf life, you can set to 0 to disable it
 
 
 ## Getting
