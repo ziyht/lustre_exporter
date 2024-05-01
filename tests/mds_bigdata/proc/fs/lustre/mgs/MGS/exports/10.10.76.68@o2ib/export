@@ -1,0 +1,9 @@
+40c3e04f-dadb-cfc9-392d-fc8d1af9d2d7:
+    name: MGS
+    client: 10.10.76.68@o2ib
+    connect_flags: [ version, barrier, adaptive_timeouts, mds_mds_connection, full20, imp_recov, bulk_mbits ]
+    connect_data:
+       flags: 0x2000011005002020
+       instance: 0
+       target_version: 2.12.6.0
+    export_flags: [  ]

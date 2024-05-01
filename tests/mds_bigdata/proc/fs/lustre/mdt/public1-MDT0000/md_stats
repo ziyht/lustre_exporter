@@ -1,0 +1,17 @@
+snapshot_time             1660281545.795422725 secs.nsecs
+open                      47592297965 samples [reqs]
+close                     17987924787 samples [reqs] 1 1 17987924787
+mknod                     133397332 samples [reqs] 1 1 133397332
+link                      6719110 samples [reqs]
+unlink                    106388493 samples [reqs]
+mkdir                     14305172 samples [reqs]
+rmdir                     10089501 samples [reqs]
+rename                    8768019 samples [reqs]
+getattr                   7270582189 samples [reqs]
+setattr                   3204470079 samples [reqs]
+getxattr                  246776357 samples [reqs]
+setxattr                  456888 samples [reqs]
+statfs                    206006455 samples [reqs]
+sync                      16910180 samples [reqs]
+samedir_rename            6186491 samples [reqs]
+crossdir_rename           2581528 samples [reqs]

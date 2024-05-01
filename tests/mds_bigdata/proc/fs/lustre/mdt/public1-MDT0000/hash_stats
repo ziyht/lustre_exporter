@@ -1,0 +1,4 @@
+name                                                               cur   min   max theta t-min t-max flags rehash   count  maxdep maxdepb distribution
+UUID_HASH                                                          512   128  4096 1.359 0.500 2.000  0x284      2     696      -1      -1 16/0/0/0/0/0/0/0
+NID_HASH                                                           512   128  4096 1.359 0.500 2.000  0x284      2     696      -1      -1 16/0/0/0/0/0/0/0
+NID_STATS                                                          512   128  4096 1.316 0.500 2.000  0x284      2     674      -1      -1 16/0/0/0/0/0/0/0

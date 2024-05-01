@@ -1,0 +1,18 @@
+4ec6ba31-be01-03f8-b412-79485fd1b5b3:
+    name: MGS
+    client: 0@lo
+    connect_flags: [ version, barrier, adaptive_timeouts, mds_mds_connection, full20, imp_recov, bulk_mbits ]
+    connect_data:
+       flags: 0x2000011005002020
+       instance: 0
+       target_version: 2.12.5.0
+    export_flags: [  ]
+bed17be8-0d05-2864-09ac-78ce6f3da818:
+    name: MGS
+    client: 0@lo
+    connect_flags: [ version, barrier, adaptive_timeouts, mds_mds_connection, full20, imp_recov, bulk_mbits ]
+    connect_data:
+       flags: 0x2000011005002020
+       instance: 0
+       target_version: 2.12.5.0
+    export_flags: [  ]

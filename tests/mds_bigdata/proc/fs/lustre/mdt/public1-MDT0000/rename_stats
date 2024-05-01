@@ -1,0 +1,41 @@
+rename_stats:
+- snapshot_time:  1660281546.457011057
+- same_dir       
+      4KB: { sample: 2721386, pct:  43, cum_pct:  43 }
+      8KB: { sample:   0, pct:   0, cum_pct:  43 }
+      16KB: { sample: 1962726, pct:  31, cum_pct:  75 }
+      32KB: { sample: 776664, pct:  12, cum_pct:  88 }
+      64KB: { sample: 194419, pct:   3, cum_pct:  91 }
+      128KB: { sample: 127023, pct:   2, cum_pct:  93 }
+      256KB: { sample: 109522, pct:   1, cum_pct:  95 }
+      512KB: { sample: 252502, pct:   4, cum_pct:  99 }
+      1MB: { sample: 15148, pct:   0, cum_pct:  99 }
+      2MB: { sample: 9656, pct:   0, cum_pct:  99 }
+      4MB: { sample: 17428, pct:   0, cum_pct:  99 }
+      8MB: { sample:  17, pct:   0, cum_pct: 100 }
+- crossdir_src   
+      4KB: { sample: 202826, pct:   7, cum_pct:   7 }
+      8KB: { sample:   0, pct:   0, cum_pct:   7 }
+      16KB: { sample: 144549, pct:   5, cum_pct:  13 }
+      32KB: { sample: 69407, pct:   2, cum_pct:  16 }
+      64KB: { sample: 137502, pct:   5, cum_pct:  21 }
+      128KB: { sample: 1899803, pct:  73, cum_pct:  95 }
+      256KB: { sample: 31077, pct:   1, cum_pct:  96 }
+      512KB: { sample: 51840, pct:   2, cum_pct:  98 }
+      1MB: { sample: 43579, pct:   1, cum_pct:  99 }
+      2MB: { sample: 944, pct:   0, cum_pct:  99 }
+      4MB: { sample:   0, pct:   0, cum_pct:  99 }
+      8MB: { sample:   0, pct:   0, cum_pct:  99 }
+      16MB: { sample:   1, pct:   0, cum_pct: 100 }
+- crossdir_tgt   
+      4KB: { sample: 280706, pct:  10, cum_pct:  10 }
+      8KB: { sample:   0, pct:   0, cum_pct:  10 }
+      16KB: { sample: 124233, pct:   4, cum_pct:  15 }
+      32KB: { sample: 192504, pct:   7, cum_pct:  23 }
+      64KB: { sample: 108048, pct:   4, cum_pct:  27 }
+      128KB: { sample: 159572, pct:   6, cum_pct:  33 }
+      256KB: { sample: 249279, pct:   9, cum_pct:  43 }
+      512KB: { sample: 416891, pct:  16, cum_pct:  59 }
+      1MB: { sample: 551115, pct:  21, cum_pct:  80 }
+      2MB: { sample: 366235, pct:  14, cum_pct:  94 }
+      4MB: { sample: 132945, pct:   5, cum_pct: 100 }

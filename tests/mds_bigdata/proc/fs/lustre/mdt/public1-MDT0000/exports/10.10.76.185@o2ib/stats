@@ -1,0 +1,6 @@
+snapshot_time             1660281545.747230832 secs.nsecs
+open                      195362 samples [reqs]
+close                     168415 samples [reqs]
+getattr                   9588 samples [reqs]
+getxattr                  2 samples [reqs]
+statfs                    280100 samples [reqs]

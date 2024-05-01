@@ -1,0 +1,9 @@
+abad02a2-1d85-a0ec-09c4-75c63c561e2e:
+    name: MGS
+    client: 172.16.76.35@tcp
+    connect_flags: [ version, barrier, adaptive_timeouts, mds_mds_connection, full20, imp_recov, bulk_mbits ]
+    connect_data:
+       flags: 0x2000011005002020
+       instance: 0
+       target_version: 2.12.6.0
+    export_flags: [  ]

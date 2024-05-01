@@ -1,0 +1,10 @@
+snapshot_time             1660281545.453871582 secs.nsecs
+open                      296025948 samples [reqs]
+close                     25940711 samples [reqs]
+mknod                     6614 samples [reqs]
+mkdir                     771 samples [reqs]
+getattr                   173520 samples [reqs]
+setattr                   2227 samples [reqs]
+getxattr                  5772 samples [reqs]
+statfs                    560094 samples [reqs]
+sync                      21993 samples [reqs]

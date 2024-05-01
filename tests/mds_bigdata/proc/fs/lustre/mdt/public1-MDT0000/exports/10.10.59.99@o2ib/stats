@@ -1,0 +1,13 @@
+snapshot_time             1660281545.279754574 secs.nsecs
+open                      652243 samples [reqs]
+close                     396231 samples [reqs]
+mknod                     4774 samples [reqs]
+unlink                    1124 samples [reqs]
+mkdir                     18 samples [reqs]
+rename                    744 samples [reqs]
+getattr                   73166 samples [reqs]
+setattr                   13443 samples [reqs]
+getxattr                  6291 samples [reqs]
+statfs                    280085 samples [reqs]
+samedir_rename            564 samples [reqs]
+crossdir_rename           180 samples [reqs]

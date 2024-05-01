@@ -1,0 +1,45 @@
+fsname: public1
+flags: 0x20     gen: 191
+public1-MDT0000
+public1-OST0000
+public1-OST0001
+public1-OST0002
+public1-OST0003
+public1-OST0004
+public1-OST0005
+public1-OST0006
+public1-OST0007
+public1-OST0008
+public1-OST0009
+public1-OST000a
+public1-OST000b
+public1-OST000c
+public1-OST000d
+public1-OST000e
+public1-OST000f
+public1-OST0010
+public1-OST0011
+public1-OST0012
+public1-OST0013
+public1-OST0014
+public1-OST0015
+public1-OST0016
+public1-OST0017
+public1-OST0018
+public1-OST0019
+public1-OST001a
+public1-OST001b
+public1-OST001c
+public1-OST001d
+public1-OST001e
+public1-OST001f
+
+Secure RPC Config Rules:
+
+imperative_recovery_state:
+    state: full
+    nonir_clients: 0
+    nidtbl_version: 239
+    notify_duration_total: 0.017358633
+    notify_duation_max: 0.017035841
+    notify_count: 7

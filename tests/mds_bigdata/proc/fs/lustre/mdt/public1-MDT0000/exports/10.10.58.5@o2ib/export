@@ -1,0 +1,72 @@
+public1-MDT0000-lwp-OST001b_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST001f_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST0017_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST001d_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST0013_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST0011_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST0015_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
+public1-MDT0000-lwp-OST0019_UUID:
+    name: public1-MDT0000
+    client: 10.10.58.5@o2ib
+    connect_flags: [ version, adaptive_timeouts, lru_resize, fid_is_enabled, full20, lvb_type, lightweight_conn, lfsck, bulk_mbits ]
+    connect_data:
+       flags: 0x2041401043000020
+       instance: 11
+       target_version: 2.12.5.0
+    export_flags: [  ]
