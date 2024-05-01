@@ -1,0 +1,14 @@
+pool:
+    id: 0
+    type: dt
+    ref: 2
+    least qunit: 1024
+    usr:
+        #slv: 33
+        #lqe: 6632
+    grp:
+        #slv: 33
+        #lqe: 3
+    prj:
+        #slv: 0
+        #lqe: 1
